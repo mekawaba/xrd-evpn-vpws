@@ -11,6 +11,9 @@
                  xrd-8(vRR)
 
 
+0. シナリオファイルの作成
+xr-compose -f docker-compose.xr.yml -i ios-xr/xrd-control-plane:25.1.1
+
 1. lab の起動
 docker-compose up -d
 
