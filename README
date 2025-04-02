@@ -1,0 +1,491 @@
+# SR-MPLS EVPN VPWS Multi-Homing All-Active lab
+
+                 xrd-7(PCE)
+                 /        \
+              xrd-3 --- xrd-4
+               / |        | \
+       xrd-1(CE) |        |  xrd-2(CE)
+               \ |        | /
+              xrd-5 --- xrd-6
+                 \        /
+                 xrd-8(vRR)
+
+
+1. lab の起動
+docker-compose up -d
+
+2. デバイスへの接続
+docker attach xrd-1
+
+3. 確認コマンド (PE)
+**********
+  Bundle
+**********
+```
+RP/0/RP0/CPU0:xrd-3#show bundle bundle-Ether 1
+Wed Apr  2 11:24:10.852 UTC
+
+Bundle-Ether1
+  Status:                                    Up
+  Local links <active/standby/configured>:   1 / 0 / 1
+  Local bandwidth <effective/available>:     1000000 (1000000) kbps
+  MAC address (source):                      0005.5f4f.0bcb (Chassis pool)
+  Inter-chassis link:                        No
+  Minimum active links / bandwidth:          1 / 1 kbps
+  Maximum active links:                      64
+  Wait while timer:                          2000 ms
+  Load balancing:
+    Link order signaling:                    Not configured
+    Hash type:                               Default
+    Locality threshold:                      None
+  LACP:                                      Not operational
+    Flap suppression timer:                  Off
+    Cisco extensions:                        Disabled
+    Non-revertive:                           Disabled
+  mLACP:                                     Not configured
+  IPv4 BFD:                                  Not configured
+  IPv6 BFD:                                  Not configured
+
+  Port                  Device           State        Port ID         B/W, kbps
+  --------------------  ---------------  -----------  --------------  ----------
+  Gi0/0/0/2             Local            Active       0x8000, 0x0000     1000000
+      Link is Active
+RP/0/RP0/CPU0:xrd-3#
+```
+
+********
+  OSPF
+********
+
+```
+RP/0/RP0/CPU0:xrd-3#show ospf neighbor
+Wed Apr  2 10:52:04.376 UTC
+
+* Indicates MADJ interface
+# Indicates Neighbor awaiting BFD session up
+
+Neighbors for OSPF 100
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+100.100.100.104 1     FULL/DR         00:00:32    100.103.104.104 GigabitEthernet0/0/0/0
+    Neighbor is up for 01:07:05
+100.100.100.105 1     FULL/DR         00:00:30    100.103.105.105 GigabitEthernet0/0/0/1
+    Neighbor is up for 01:07:10
+100.100.100.107 1     FULL/DR         00:00:39    100.103.107.107 GigabitEthernet0/0/0/3
+    Neighbor is up for 01:07:06
+
+Total neighbor count: 3
+RP/0/RP0/CPU0:xrd-3#
+```
+
+********
+  BGP
+********
+
+```
+RP/0/RP0/CPU0:xrd-3#show bgp neighbor brief
+Wed Apr  2 10:54:24.220 UTC
+
+Neighbor         Spk    AS  Description                         Up/Down  NBRState
+100.100.100.107   0   100                                      01:09:20 Established
+100.100.100.108   0   100                                      01:09:17 Established
+RP/0/RP0/CPU0:xrd-3#
+
+RP/0/RP0/CPU0:xrd-3#show bgp l2vpn evpn summary
+Wed Apr  2 10:54:29.354 UTC
+BGP router identifier 100.100.100.103, local AS number 100
+BGP generic scan interval 60 secs
+Non-stop routing is enabled
+BGP table state: Active
+Table ID: 0x0
+BGP main routing table version 125
+BGP NSR Initial initsync version 1 (Reached)
+BGP NSR/ISSU Sync-Group versions 0/0
+BGP scan interval 60 secs
+
+BGP is operating in STANDALONE mode.
+
+
+Process    RcvTblVer     bRIB/RIB     LabelVer    ImportVer    SendTblVer   StandbyVer
+Speaker          125           125           125           125           125             0
+
+Neighbor        Spk    AS MsgRcvd MsgSent       TblVer  InQ OutQ  Up/Down  St/PfxRcd
+100.100.100.108   0   100     132      87          125    0    0 01:09:23          7
+
+RP/0/RP0/CPU0:xrd-3#
+
+RP/0/RP0/CPU0:xrd-3#show bgp l2vpn evpn
+Wed Apr  2 10:54:39.902 UTC
+BGP router identifier 100.100.100.103, local AS number 100
+BGP generic scan interval 60 secs
+Non-stop routing is enabled
+BGP table state: Active
+Table ID: 0x0
+BGP main routing table version 125
+BGP NSR Initial initsync version 1 (Reached)
+BGP NSR/ISSU Sync-Group versions 0/0
+BGP scan interval 60 secs
+
+Status codes: s suppressed, d damped, h history, * valid, > best
+              i - internal, r RIB-failure, S stale, N Nexthop-discard
+Origin codes: i - IGP, e - EGP, ? - incomplete
+   Network            Next Hop            Metric LocPrf Weight Path
+Route Distinguisher: 100.100.100.103:0 (default for vrf ES:GLOBAL)
+Route Distinguisher Version: 119
+*> [1][100.100.100.103:1][0011.1111.1111.1111.1111][4294967295]/184
+                      0.0.0.0                                0 i
+*> [4][0011.1111.1111.1111.1111][32][100.100.100.103]/128
+                      0.0.0.0                                0 i
+*>i[4][0011.1111.1111.1111.1111][32][100.100.100.105]/128
+                      100.100.100.105               100      0 i
+Route Distinguisher: 100.100.100.103:100 (default for vrf VPWS:100)
+Route Distinguisher Version: 125
+*> [1][0011.1111.1111.1111.1111][100100]/120
+                      0.0.0.0                                0 i
+* i                   100.100.100.105               100      0 i
+*>i[1][0011.1111.1111.1111.1111][4294967295]/120
+                      100.100.100.105               100      0 i
+*>i[1][0022.2222.2222.2222.2222][100100]/120
+                      100.100.100.104               100      0 i
+* i                   100.100.100.106               100      0 i
+*>i[1][0022.2222.2222.2222.2222][4294967295]/120
+                      100.100.100.104               100      0 i
+* i                   100.100.100.106               100      0 i
+Route Distinguisher: 100.100.100.104:1
+Route Distinguisher Version: 66
+*>i[1][100.100.100.104:1][0022.2222.2222.2222.2222][4294967295]/184
+                      100.100.100.104               100      0 i
+Route Distinguisher: 100.100.100.104:100
+Route Distinguisher Version: 60
+*>i[1][0022.2222.2222.2222.2222][100100]/120
+                      100.100.100.104               100      0 i
+Route Distinguisher: 100.100.100.105:0
+Route Distinguisher Version: 117
+*>i[4][0011.1111.1111.1111.1111][32][100.100.100.105]/128
+                      100.100.100.105               100      0 i
+Route Distinguisher: 100.100.100.105:1
+Route Distinguisher Version: 124
+*>i[1][100.100.100.105:1][0011.1111.1111.1111.1111][4294967295]/184
+                      100.100.100.105               100      0 i
+Route Distinguisher: 100.100.100.105:100
+Route Distinguisher Version: 118
+*>i[1][0011.1111.1111.1111.1111][100100]/120
+                      100.100.100.105               100      0 i
+Route Distinguisher: 100.100.100.106:1
+Route Distinguisher Version: 78
+*>i[1][100.100.100.106:1][0022.2222.2222.2222.2222][4294967295]/184
+                      100.100.100.106               100      0 i
+Route Distinguisher: 100.100.100.106:100
+Route Distinguisher Version: 73
+*>i[1][0022.2222.2222.2222.2222][100100]/120
+                      100.100.100.106               100      0 i
+
+Processed 14 prefixes, 17 paths
+RP/0/RP0/CPU0:xrd-3#
+
+
+RP/0/RP0/CPU0:xrd-3#show bgp l2vpn evpn rd 100.100.100.104:100 [1][0022.2222.2222.2222.2222][100100]/120
+Wed Apr  2 11:07:07.214 UTC
+BGP routing table entry for [1][0022.2222.2222.2222.2222][100100]/120, Route Distinguisher: 100.100.100.104:100
+Versions:
+  Process           bRIB/RIB   SendTblVer
+  Speaker                 60           60
+    Flags: 0x00040001+0x00000000+0x00000000
+Last Modified: Apr  2 10:29:26.393 for 00:37:40
+Paths: (1 available, best #1)
+  Not advertised to any peer
+  Path #1: Received by speaker 0
+  Flags: 0x2000000025060005+0x00, import: 0x31f, EVPN: 0x0
+  Not advertised to any peer
+  Local
+    100.100.100.104 (metric 2) from 100.100.100.108 (100.100.100.104), if-handle 0x00000000
+      Received Label 24000
+      Origin IGP, localpref 100, valid, internal, best, group-best, import-candidate, not-in-vrf
+      Received Path ID 0, Local Path ID 1, version 60
+      Extended community: EVPN L2 ATTRS:0x06:0 RT:100:100
+      Originator: 100.100.100.104, Cluster list: 100.100.100.108
+RP/0/RP0/CPU0:xrd-3#
+
+
+RP/0/RP0/CPU0:xrd-3#show mpls forwarding
+Wed Apr  2 11:07:41.521 UTC
+Local  Outgoing    Prefix             Outgoing     Next Hop        Bytes
+Label  Label       or ID              Interface                    Switched
+------ ----------- ------------------ ------------ --------------- ------------
+16104  Pop         SR Pfx (idx 104)   Gi0/0/0/0    100.103.104.104 0
+16105  Pop         SR Pfx (idx 105)   Gi0/0/0/1    100.103.105.105 22684
+16106  16106       SR Pfx (idx 106)   Gi0/0/0/0    100.103.104.104 0
+       16106       SR Pfx (idx 106)   Gi0/0/0/1    100.103.105.105 0
+16107  Pop         SR Pfx (idx 107)   Gi0/0/0/3    100.103.107.107 40482
+16108  16108       SR Pfx (idx 108)   Gi0/0/0/1    100.103.105.105 11588
+24000  Pop         SR Adj (idx 0)     Gi0/0/0/1    100.103.105.105 0
+24001  Pop         SR Adj (idx 0)     Gi0/0/0/3    100.103.107.107 0
+24002  Pop         SR Adj (idx 0)     Gi0/0/0/0    100.103.104.104 0
+24005  24000       EVPN:100                        100.100.100.104 0
+       24001       EVPN:100                        100.100.100.106 1180
+24006  Pop         PW(EVI=100 AC-ID=100100)   \
+                                      BE1          point2point     0
+RP/0/RP0/CPU0:xrd-3#
+```
+
+********
+  EVPN
+********
+
+```
+RP/0/RP0/CPU0:xrd-3#show l2vpn xconnect
+Wed Apr  2 11:10:11.367 UTC
+Legend: ST = State, UP = Up, DN = Down, AD = Admin Down, UR = Unresolved,
+        SB = Standby, SR = Standby Ready, (PP) = Partially Programmed,
+        LU = Local Up, RU = Remote Up, CO = Connected, (SI) = Seamless Inactive
+
+XConnect                   Segment 1                       Segment 2
+Group      Name       ST   Description            ST       Description            ST
+------------------------   -----------------------------   -----------------------------
+v100       eline100   UP   BE1                    UP       EVPN 100,100100,24005  UP
+----------------------------------------------------------------------------------------
+RP/0/RP0/CPU0:xrd-3#
+RP/0/RP0/CPU0:xrd-3#
+RP/0/RP0/CPU0:xrd-3#show l2vpn forwarding interface Bundle-Ether 1 detail location 0/RP0/CPU0
+Wed Apr  2 11:10:33.468 UTC
+Local interface: Bundle-Ether1, Xconnect id: 0xfffc0001, Status: up
+  Segment 1
+    AC, Bundle-Ether1, Ethernet port mode, status: Bound
+    Statistics:
+      packets: received 0, sent 0
+      bytes: received 0, sent 0
+  Segment 2
+    MPLS, Internal Label: 24005, evi: 100, ac-id: 100100, status: Bound
+    Pseudowire label: 24005
+    Control word enabled
+    Statistics:
+      packets: received 0, sent 0
+      bytes: received 0, sent 0
+    PD System Data:  0x00000000, 0x00000000, 0x00000000, 0x0100fcff, 0x3c000000,
+                    0x00000000, 0x00000000
+RP/0/RP0/CPU0:xrd-3#
+RP/0/RP0/CPU0:xrd-3#show evpn evi vpn-id 100 detail
+Wed Apr  2 11:10:56.908 UTC
+
+VPN-ID     Encap      Bridge Domain                Type
+---------- ---------- ---------------------------- -------------------
+100        MPLS       VPWS:100                     VPWS (vlan-unaware)
+   Stitching: Regular
+   Unicast Label  : 0
+   Multicast Label: 0
+   Reroute Label: 0
+   Flow Label: N
+   Dynamic Flow Label: No
+   Control-Word: Enabled
+   E-Tree: Root
+   Forward-class: 0
+   Advertise MACs: No
+   Advertise BVI MACs: No
+   Aliasing: Enabled
+   UUF: Enabled
+   Re-origination: Enabled
+   Multicast:
+     IGMP-Snooping Proxy: No
+     MLD-Snooping Proxy : No
+   BGP Implicit Import: Enabled
+   VRF Name:
+   Preferred Nexthop Mode: Off
+   Ignore MTU Mismatch: Enabled
+   Transmit MTU Zero: Enabled
+   BVI Coupled Mode: No
+   BVI Subnet Withheld: ipv4 No, ipv6 No
+   L3VRF Label Mode: Per-VRF
+
+   Statistics:
+     Packets            Sent                 Received
+       Total          : 0                    0
+       Unicast        : 0                    0
+       BUM            : 0                    0
+     Bytes              Sent                 Received
+       Total          : 0                    0
+       Unicast        : 0                    0
+       BUM            : 0                    0
+   RD Config: none
+   RD Auto  : (auto) 100.100.100.103:100
+   RT Auto  : 100:100
+   Route Targets in Use           Type
+   ------------------------------ ---------------------
+   100:100                        Import
+   100:100                        Export
+
+RP/0/RP0/CPU0:xrd-3#
+RP/0/RP0/CPU0:xrd-3#
+RP/0/RP0/CPU0:xrd-3#show evpn ethernet-segment
+Wed Apr  2 11:11:12.254 UTC
+
+Ethernet Segment Id      Interface                          Nexthops
+------------------------ ---------------------------------- --------------------
+0011.1111.1111.1111.1111 BE1                                100.100.100.103
+                                                            100.100.100.105
+RP/0/RP0/CPU0:xrd-3#
+RP/0/RP0/CPU0:xrd-3#show evpn ethernet-segment esi 0011.1111.1111.1111.1111 detail
+Wed Apr  2 11:11:20.533 UTC
+Legend:
+  B   - No Forwarders EVPN-enabled,
+  C   - MAC missing (Grouping ES-MAC vES),
+  RT  - ES-Import Route Target missing,
+  E   - ESI missing,
+  H   - Interface handle missing,
+  I   - Name (Interface or Virtual Access) missing,
+  M   - Interface in Down state,
+  O   - BGP End of Download missing,
+  P   - Interface already Access Protected,
+  Pf  - Interface forced single-homed,
+  R   - BGP RID not received,
+  S   - Interface in redundancy standby state,
+  X   - ESI-extracted MAC Conflict
+  SHG - No local split-horizon-group label allocated
+  Hp  - Interface blocked on peering complete during HA event
+  Rc  - Recovery timer running during peering sequence
+
+Ethernet Segment Id      Interface                          Nexthops
+------------------------ ---------------------------------- --------------------
+0011.1111.1111.1111.1111 BE1                                100.100.100.103
+                                                            100.100.100.105
+  ES to BGP Gates   : Ready
+  ES to L2FIB Gates : Ready
+  Main port         :
+     Interface name : Bundle-Ether1
+     Interface MAC  : 0005.5f4f.0bcb
+     IfHandle       : 0x0000003c
+     State          : Up
+     Redundancy     : Not Defined
+  ESI ID            : 1
+  ESI type          : 0
+     Value          : 0011.1111.1111.1111.1111
+  ES Import RT      : 1111.1111.1111 (from ESI)
+  Topology          :
+     Operational    : MH, All-active
+     Configured     : All-active (AApF) (default)
+  Service Carving   : Auto-selection
+     Multicast      : Disabled
+  Convergence       :
+  Peering Details   : 2 Nexthops
+     100.100.100.103 [MOD:P:00:T]
+     100.100.100.105 [MOD:P:00:T]
+  Service Carving Synchronization:
+     Mode           : NONE
+     Peer Updates   :
+         100.100.100.103 [SCT: N/A]
+         100.100.100.105 [SCT: N/A]
+  Service Carving Results:
+     Forwarders     : 1
+     Elected        : 0
+     Not Elected    : 0
+  EVPN-VPWS Service Carving Results:
+     Primary        : 1
+     Backup         : 0
+     Non-DF         : 0
+  MAC Flush msg     : STP-TCN
+  Peering timer     : 3 sec [not running]
+  Recovery timer    : 30 sec [not running]
+  Carving timer     : 0 sec [not running]
+  Revert timer      : 0 sec [not running]
+  HRW Reset timer   : 5 sec [not running]
+  Local SHG label   : 24009
+     IPv6_Filtering_ID : 1:16
+  Remote SHG labels : 1
+              24007 : nexthop 100.100.100.105
+  Access signal mode: Bundle OOS
+
+RP/0/RP0/CPU0:xrd-3#
+
+↓は正確に表示されません。
+RP/0/RP0/CPU0:xrd-3#show evpn evi mac
+Wed Apr  2 11:18:46.020 UTC
+
+VPN-ID     Encap      MAC address    IP address                               Nexthop                                 Label    SID
+---------- ---------- -------------- ---------------------------------------- --------------------------------------- -------- ---------------------------------------
+100        MPLS       000d.2831.7937 ::                                       100.100.100.105                         24006
+100        MPLS       9230.8ae5.f56f ::                                       100.100.100.105                         24006
+RP/0/RP0/CPU0:xrd-3#
+```
+
+
+4. 確認コマンド (CE)
+**********
+  Bundle
+**********
+
+```
+RP/0/RP0/CPU0:xrd-1#show bundle bundle-Ether 1
+Wed Apr  2 11:27:19.421 UTC
+
+Bundle-Ether1
+  Status:                                    Up
+  Local links <active/standby/configured>:   2 / 0 / 2
+  Local bandwidth <effective/available>:     2000000 (2000000) kbps
+  MAC address (source):                      000d.2831.7937 (Chassis pool)
+  Inter-chassis link:                        No
+  Minimum active links / bandwidth:          1 / 1 kbps
+  Maximum active links:                      64
+  Wait while timer:                          2000 ms
+  Load balancing:
+    Link order signaling:                    Not configured
+    Hash type:                               Default
+    Locality threshold:                      None
+  LACP:                                      Not operational
+    Flap suppression timer:                  Off
+    Cisco extensions:                        Disabled
+    Non-revertive:                           Disabled
+  mLACP:                                     Not configured
+  IPv4 BFD:                                  Not configured
+  IPv6 BFD:                                  Not configured
+
+  Port                  Device           State        Port ID         B/W, kbps
+  --------------------  ---------------  -----------  --------------  ----------
+  Gi0/0/0/0             Local            Active       0x8000, 0x0000     1000000
+      Link is Active
+  Gi0/0/0/1             Local            Active       0x8000, 0x0000     1000000
+      Link is Active
+RP/0/RP0/CPU0:xrd-1#
+
+
+RP/0/RP0/CPU0:xrd-1#show arp
+Wed Apr  2 11:26:47.110 UTC
+
+-------------------------------------------------------------------------------
+0/RP0/CPU0
+-------------------------------------------------------------------------------
+Address         Age        Hardware Addr   State      Type  Interface
+10.1.1.2        -          000d.2831.7937  Interface  ARPA  Bundle-Ether1
+10.1.1.3        00:48:36   0002.ba06.0825  Dynamic    ARPA  Bundle-Ether1
+172.40.0.101    -          7ee0.5c3f.ffc6  Interface  ARPA  MgmtEth0/RP0/CPU0/0
+172.40.0.102    01:40:52   065a.beea.b175  Dynamic    ARPA  MgmtEth0/RP0/CPU0/0
+172.40.0.103    01:29:39   d21f.364f.9978  Dynamic    ARPA  MgmtEth0/RP0/CPU0/0
+172.40.0.104    01:31:56   b6cf.078f.95a1  Dynamic    ARPA  MgmtEth0/RP0/CPU0/0
+172.40.0.105    01:34:06   0e34.d1f9.52ac  Dynamic    ARPA  MgmtEth0/RP0/CPU0/0
+172.40.0.106    01:26:03   0a09.017f.14fc  Dynamic    ARPA  MgmtEth0/RP0/CPU0/0
+172.40.0.107    01:27:31   8288.3f13.8545  Dynamic    ARPA  MgmtEth0/RP0/CPU0/0
+172.40.0.108    01:21:38   c669.ab88.01ad  Dynamic    ARPA  MgmtEth0/RP0/CPU0/0
+RP/0/RP0/CPU0:xrd-1#
+```
+
+********
+  Ping
+********
+
+```
+RP/0/RP0/CPU0:xrd-1#show ip int brief
+Wed Apr  2 11:27:55.880 UTC
+
+Interface                      IP-Address      Status          Protocol Vrf-Name
+Bundle-Ether1                  10.1.1.2        Up              Up       default
+MgmtEth0/RP0/CPU0/0            172.40.0.101    Up              Up       default
+GigabitEthernet0/0/0/0         unassigned      Up              Up       default
+GigabitEthernet0/0/0/1         unassigned      Up              Up       default
+GigabitEthernet0/0/0/2         unassigned      Shutdown        Down     default
+RP/0/RP0/CPU0:xrd-1#
+RP/0/RP0/CPU0:xrd-1#ping 10.1.1.3 source Bundle-Ether 1
+Wed Apr  2 11:28:03.852 UTC
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 10.1.1.3 timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 4/4/8 ms
+RP/0/RP0/CPU0:xrd-1#
+```
